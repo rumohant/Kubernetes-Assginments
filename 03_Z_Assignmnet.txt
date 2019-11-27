@@ -1,0 +1,195 @@
+Learning Objectives:-
+Create a yaml file containing the pod spec for the nginx pod.
+Create the pod.
+
+
+Your company is getting ready to launch a new website, and they need you to set up an nginx web server in their Kubernetes cluster. The nginx server will need to be accessible via network in the future, so you will need to expose port 80 as a containerPort for the nginx container. Your team has also asked you to ensure that nginx runs in quiet mode for the time being to cut down on unnecessary log output. You can do this by setting the command to nginx and passing the following arg to the container: -g daemon off; -q. As this nginx server belongs to the Web team, you will need to create it in the team's web namespace.
+
+To summarize:
+
+Use the nginx container image.
+The container needs a containerPort of 80.
+Set the command to nginx
+Pass in the -g daemon off; -q args to run nginx in quiet mode.
+Create the pod in the web namespace.
+Once the pod is created, you should be able to find it with kubectl get pods -n web. 
+Once the pod is created, you can get more information about its current status with kubectl describe pod nginx -n web.
+
+
+
+Step1---> Creating YML file
+			vi fruit-service-ambassador-config.yml
+Step 2--> Insrt data
+
+			apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fruit-service-ambassador-config
+  namespace: default
+data:
+  config: |
+    global
+        daemon
+        maxconn 256
+
+    defaults
+        mode http
+        timeout connect 5000ms
+        timeout client 50000ms
+        timeout server 50000ms
+
+    listen http-in
+        bind *:80
+        server server1 127.0.0.1:8775 maxconn 32 
+		
+Step3---> kubectl apply  -f fruit-service-ambassador-config.yml
+
+o/p--> master $ launch.sh
+Waiting for Kubernetes to start...
+Kubernetes started
+master $ vi fruit-service-ambassador-config.yml
+master $ kubectl apply  -f fruit-service-ambassador-config.yml
+configmap/fruit-service-ambassador-config created
+
+
+Step4---> vi busybox.yml
+
+insrt below
+
+	apiVersion: v1
+kind: Pod
+metadata:
+  name: busybox
+spec:
+  containers:
+  - name: myapp-container
+    image: radial/busyboxplus:curl
+    command: ['sh', '-c', 'while true; do sleep 3600; done']
+
+Srep5---> master $ kubectl apply  -f busybox.yml
+pod/busybox created
+
+Step6--->  vi fruit-service.yml
+
+Insrt below data
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fruit-service
+  labels:
+    app: my-app
+spec:
+  containers:
+  - name: fruit-ctr
+    image: linuxacademycontent/legacy-fruit-service:1
+  - name: ambassador
+    image: haproxy:1.7
+    ports:
+    - containerPort: 80
+    volumeMounts:
+    - name: fruit-service-ambassador-config
+      mountPath: /usr/local/etc/haproxy
+  volumes:
+  - name: fruit-service-ambassador-config
+    configMap:
+       name: fruit-service-ambassador-config
+       items:
+        - key: config
+          path: haproxy.cfg
+
+Stp7------>  master $ kubectl apply -f fruit-service.yml
+pod/fruit-service created		  
+
+Step8------> kubectl exec busybox -- curl $(kubectl get pod fruit-service -o=custom-columns=IP:.status.podIP --no-headers):80
+
+O/P---> 
+{
+  "description": "A list of fruits.",
+  "fruits": [
+    "apple",
+    "apricot",
+    "avocado",
+    "banana",
+    "bell pepper",
+    "bilberry",
+    "blackberry",
+    "blackcurrant",
+    "blood orange",
+    "blueberry",
+    "boysenberry",
+    "breadfruit",
+    "canary melon",
+    "cantaloupe",
+    "cherimoya",
+    "cherry",
+    "chili pepper",
+    "clementine",
+    "cloudberry",
+    "coconut",
+    "cranberry",
+    "cucumber",
+    "currant",
+    "damson",
+    "date",
+    "dragonfruit",
+    "durian",
+    "eggplant",
+    "elderberry",
+    "feijoa",
+    "fig",
+    "goji berry",
+    "gooseberry",
+    "grape",
+    "grapefruit",
+    "guava",
+    "honeydew",
+    "huckleberry",
+    "jackfruit",
+    "jambul",
+    "jujube",
+    "kiwi fruit",
+    "kumquat",
+    "lemon",
+    "lime",
+    "loquat",
+    "lychee",
+    "mandarine",
+    "mango",
+    "mulberry",
+    "nectarine",
+    "nut",
+    "olive",
+    "orange",
+    "pamelo",
+    "papaya",
+    "passionfruit",
+    "peach",
+    "pear",
+    "persimmon",
+    "physalis",
+    "pineapple",
+    "plum",
+    "pomegranate",
+    "pomelo",
+    "purple mangosteen",
+    "quince",
+    "raisin",
+    "rambutan",
+    "raspberry",
+    "redcurrant",
+    "rock melon",
+    "salal berry",
+    "satsuma",
+    "star fruit",
+    "strawberry",
+    "tamarillo",
+    "tangerine",
+    "tomato",
+    "ugli fruit",
+    "watermelon"
+  ]
+}
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100  1360  100  1360    0     0   770k      0 --:--:-- --:--:-- --:--:-- 1328k

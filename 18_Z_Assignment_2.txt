@@ -1,0 +1,115 @@
+Learning Objectives:-
+Create the cron job in the cluster
+Allow the cron job to run successfully
+
+Problem Statement:-
+Your company has a simple data cleanup process that is run periodically for maintenance purposes. 
+They would like to stop doing this manually in order to save time, so you have been asked to implement a cron job in the Kubernetes cluster to run this process. 
+Create a cron job called cleanup-cronjob using the linuxacademycontent/data-cleanup:1 image. 
+Have the job run every minute with the following cron expression: */1 * * * *.
+
+Answer-----> 
+
+Step1---> creating cleanup-cronjob yml file
+
+master $ vi cleanup-cronjob.yml
+
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: cleanup-cronjob
+spec:
+  schedule: "*/1 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: my-cleanup
+            image: linuxacademycontent/data-cleanup:1
+          restartPolicy: OnFailure
+
+
+Step2---> Cron Job Creation
+		kubectl apply -f cleanup-cronjob.yml
+cronjob.batch/cleanup-cronjob created
+
+Step3---> get the list of pod
+		kubectl get po
+NAME                               READY   STATUS      RESTARTS   AGE
+cleanup-cronjob-1574933580-xhds4   0/1     Completed   0          54s
+
+step4----> get the list of cronjob
+
+master $ kubectl get cronjobs
+
+O/P-
+	NAME              SCHEDULE      SUSPEND   ACTIVE   LAST SCHEDULE   AGE
+cleanup-cronjob   */1 * * * *   False     0        44s             10m
+
+Step4----> get the description of cleanup-cronjob
+
+
+master $ kubectl describe cronjob cleanup-cronjob
+
+master $ kubectl describe cronjob cleanup-cronjob
+Name:                          cleanup-cronjob
+Namespace:                     default
+Labels:                        <none>
+Annotations:                   kubectl.kubernetes.io/last-applied-configuration:
+                                 {"apiVersion":"batch/v1beta1","kind":"CronJob","metadata":{"annotations":{},"name":"cleanup-cronjob","namespace":"default"},"spec":{"concu...
+Schedule:                      */1 * * * *
+Concurrency Policy:            Forbid
+Suspend:                       False
+Successful Job History Limit:  824641027832
+Failed Job History Limit:      1
+Starting Deadline Seconds:     <unset>
+Selector:                      <unset>
+Parallelism:                   <unset>
+Completions:                   <unset>
+Pod Template:
+  Labels:  <none>
+  Containers:
+   my-cleanup:
+    Image:           linuxacademycontent/data-cleanup:1
+    Port:            <none>
+    Host Port:       <none>
+    Environment:     <none>
+    Mounts:          <none>
+  Volumes:           <none>
+Last Schedule Time:  Thu, 28 Nov 2019 09:45:00 +0000
+Active Jobs:         cleanup-cronjob-1574934300 
+Events:
+  Type    Reason            Age                    From                Message
+  ----    ------            ----                   ----                -------
+  Normal  SuccessfulCreate  12m                    cronjob-controller  Created job cleanup-cronjob-1574933580
+  Normal  SawCompletedJob   12m                    cronjob-controller  Saw completed job: cleanup-cronjob-1574933580
+  Normal  SuccessfulCreate  11m                    cronjob-controller  Created job cleanup-cronjob-1574933640
+  Normal  SawCompletedJob   11m                    cronjob-controller  Saw completed job: cleanup-cronjob-1574933640
+  Normal  SuccessfulDelete  11m                    cronjob-controller  Deleted job cleanup-cronjob-1574933580
+  Normal  SuccessfulCreate  10m                    cronjob-controller  Created job cleanup-cronjob-1574933700
+  Normal  SuccessfulDelete  10m                    cronjob-controller  Deleted job cleanup-cronjob-1574933640
+  Normal  SawCompletedJob   10m                    cronjob-controller  Saw completed job: cleanup-cronjob-1574933700
+  Normal  SuccessfulCreate  9m12s                  cronjob-controller  Created job cleanup-cronjob-1574933760
+  Normal  SawCompletedJob   9m2s                   cronjob-controller  Saw completed job: cleanup-cronjob-1574933760
+  Normal  SuccessfulDelete  9m2s                   cronjob-controller  Deleted job cleanup-cronjob-1574933700
+  Normal  SuccessfulCreate  8m12s                  cronjob-controller  Created job cleanup-cronjob-1574933820
+  Normal  SawCompletedJob   8m2s                   cronjob-controller  Saw completed job: cleanup-cronjob-1574933820
+  Normal  SuccessfulDelete  8m2s                   cronjob-controller  Deleted job cleanup-cronjob-1574933760
+  Normal  SuccessfulCreate  7m12s                  cronjob-controller  Created job cleanup-cronjob-1574933880
+  Normal  SawCompletedJob   7m2s                   cronjob-controller  Saw completed job: cleanup-cronjob-1574933880
+  Normal  SuccessfulDelete  7m2s                   cronjob-controller  Deleted job cleanup-cronjob-1574933820
+  Normal  SuccessfulCreate  6m11s                  cronjob-controller  Created job cleanup-cronjob-1574933940
+  Normal  SawCompletedJob   6m1s                   cronjob-controller  Saw completed job: cleanup-cronjob-1574933940
+  Normal  SuccessfulDelete  6m1s                   cronjob-controller  Deleted job cleanup-cronjob-1574933880
+  Normal  SuccessfulCreate  5m9s                   cronjob-controller  Created job cleanup-cronjob-1574934000
+  Normal  SawCompletedJob   4m59s                  cronjob-controller  Saw completed job: cleanup-cronjob-1574934000
+  Normal  SuccessfulDelete  4m59s                  cronjob-controller  Deleted job cleanup-cronjob-1574933940
+  Normal  SuccessfulCreate  4m7s                   cronjob-controller  Created job cleanup-cronjob-1574934060
+  Normal  SawCompletedJob   3m56s                  cronjob-controller  Saw completed job: cleanup-cronjob-1574934060
+  Normal  SuccessfulDelete  3m56s                  cronjob-controller  Deleted job cleanup-cronjob-1574934000
+  Normal  SuccessfulCreate  2m10s (x2 over 3m12s)  cronjob-controller  (combined from similar events): Created job cleanup-cronjob-1574934180
+  

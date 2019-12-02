@@ -1,0 +1,299 @@
+Learning Objectives:-
+Create a PersistentVolume
+Create a PersistentVolumeClaim
+Create a MySQL Pod configured to use the PersistentVolumeClaim
+
+Problem Statement:-
+Your company needs a small database server to support a new application. They have asked you to deploy a pod running a MySQL container, but they want the data to persist even if the pod is deleted or replaced. Therefore, the MySQL database pod requires persistent storage.
+
+
+You will need to do the following:-
+
+1. Create a PersistentVolume:
+	The PersistentVolume should be named mysql-pv.
+	The volume needs a capacity of 1Gi.
+	Use a storageClassName of localdisk.
+	Use the accessMode ReadWriteOnce.
+	Store the data locally on the node using a hostPath volume at the location /mnt/data.
+
+2. Create a PersistentVolumeClaim:
+	The PersistentVolumeClaim should be named mysql-pv-claim.
+	Set a resource request on the claim for 500Mi of storage.
+	Use the same storageClassName and accessModes as the PersistentVolume so that this claim can bind to the PersistentVolume.
+
+3. Create a MySQL Pod configured to use the PersistentVolumeClaim:
+	The Pod should be named mysql-pod.
+	Use the image mysql:5.6.
+	Expose the containerPort 3306.
+	Set an environment variable called MYSQL_ROOT_PASSWORD with the value password.
+	Add the PersistentVolumeClaim as a volume and mount it to the container at the path /var/lib/mysql.
+	
+	
+************************************************************************************
+
+Step1----> creating a PersistentVolume
+
+master $ vi mysql-pv.yml
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+    name: mysql-pv
+spec:
+    capacity:
+         storage: 1Gi
+    accessModes:
+         - ReadWriteOnce
+    storageClassName: slow
+    hostPath:
+        path: "/mnt/data"
+		
+		
+Step2----> creating a PersistentVolumeClaim
+master $ vi mysql-pv-claim.yml
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+    name: mysql-pv-claim
+spec:
+    resources:
+         requests:
+               storage: 500Mi
+    accessModes:
+         - ReadWriteOnce
+    storageClassName: slow
+
+Step3-----> Create a MySQL Pod configured to use the PersistentVolumeClaim
+master $ vi mysql-pod.yml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mysql-pod
+spec:
+  containers:
+  - name: mysql-container
+    image: mysql:5.6
+    ports:
+    - containerPort: 3306
+    env:
+    - name: MYSQL_ROOT_PASSWORD
+      value: password
+    volumeMounts:
+    - name: mysql-persistent-storage
+      mountPath: /var/lib/mysql
+  volumes:
+    - name: mysql-persistent-storage
+      persistentVolumeClaim:
+                  claimName: mysql-pv-claim
+
+Step4-----> Persistent-Volume
+
+master $ kubectl create -f mysql-pv.yml
+persistentvolume/mysql-pv created
+
+-------------------------------------------> 
+
+master $ kubectl get pv
+NAME       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM   STORAGECLASS   REASON   AGE
+mysql-pv   1Gi        RWO            Retain           Available           slow                    91s
+
+----------------------------------------->
+
+master $ kubectl describe pv mysql-pv
+Name:            mysql-pv
+Labels:          <none>
+Annotations:     <none>
+Finalizers:      [kubernetes.io/pv-protection]
+StorageClass:    slow
+Status:          Available
+Claim:
+Reclaim Policy:  Retain
+Access Modes:    RWO
+VolumeMode:      Filesystem
+Capacity:        1Gi
+Node Affinity:   <none>
+Message:
+Source:
+    Type:          HostPath (bare host directory volume)
+    Path:          /mnt/data
+    HostPathType:
+Events:            <none>
+
+--------------------------------------> 
+
+Step5------------> Persistent volume Claim
+
+master $ kubectl create -f mysql-pv-claim.yml
+persistentvolumeclaim/mysql-pv-claim created
+
+---------------------------------------------------->>>>>>>>>>
+
+master $  kubectl get pvc
+NAME             STATUS   VOLUME     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+mysql-pv-claim   Bound    mysql-pv   1Gi        RWO            slow           2m10s
+
+------------------------------------------------------------------------------
+
+master $ kubectl get pv
+NAME       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM                    STORAGECLASS   REASON   AGE
+mysql-pv   1Gi        RWO            Retain           Bound    default/mysql-pv-claim   slow                    7m24s
+
+Step6----------> Reference Claim in Pod
+creating mysql-pod
+
+master $ kubectl create -f mysql-pod.yml
+pod/mysql-pod created
+
+---------------------------------------------------------------------
+
+master $ kubectl get po -o wide mysql-pod
+NAME        READY   STATUS    RESTARTS   AGE   IP          NODE     NOMINATED NODE   READINESS GATES
+mysql-pod   1/1     Running   0          45s   10.32.0.2   node01   <none>           <none>
+
+-------------------------------------------------------------------------
+
+master $ kubectl exec -it mysql-pod bash
+root@mysql-pod:/# df -h /var/lib/mysql
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/vda1        45G   19G   24G  44% /var/lib/mysql
+
+-------------------------------------------------------
+
+root@mysql-pod:/var/lib/mysql# echo "MySql Pod" >test1.txt
+root@mysql-pod:/var/lib/mysql# ls
+auto.cnf  ib_logfile0  ib_logfile1  ibdata1  mysql  performance_schema  test1.txt
+
+-----------------------------
+Testing
+-------------->>>> 
+
+Step1----> Deleting mysql-pod
+master $ kubectl delete -f mysql-pod.yml
+pod "mysql-pod" deleted
+
+Again create mysql-pod to test whether "test1.txt" file exists or not
+create mysql-pod
+
+master $ kubectl create -f mysql-pod.yml
+pod/mysql-pod created
+master $ kubectl exec -it mysql-pod bash
+root@mysql-pod:/# exit
+exit
+master $ kubectl exec mysql-pod ls /var/lib/mysql
+auto.cnf
+ib_logfile0
+ib_logfile1
+ibdata1
+mysql
+performance_schema
+test1.txt
+master $ ubectl exec mysql-pod cat /var/lib/mysql/test1.txt
+ubectl: command not found
+master $ kubectl exec mysql-pod cat /var/lib/mysql/test1.txt
+MySql Pod
+
+text file exists------->
+
+
+
+------------------------------------
+
+Testing password assigned in the yml file and execute some query inside the container
+
+Step1----------->
+
+		master $ kubectl exec -it mysql-pod bash
+root@mysql-pod:/# mysql -u root -ppassword
+Warning: Using a password on the command line interface can be insecure.
+Welcome to the MySQL monitor.  Commands end with ; or \g.
+Your MySQL connection id is 1
+Server version: 5.6.44 MySQL Community Server (GPL)
+
+Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
+
+Oracle is a registered trademark of Oracle Corporation and/or its
+affiliates. Other names may be trademarks of their respective
+owners.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+mysql> use kubectl_database;
+Database changed
+
+mysql> CREATE TABLE MyGuests (
+    -> id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    -> firstname VARCHAR(30) NOT NULL,
+    -> lastname VARCHAR(30) NOT NULL,
+    -> email VARCHAR(50)
+    -> );
+Query OK, 0 rows affected (0.01 sec)
+
+mysql> show tables
+    -> ;
++----------------+
+| Tables_in_Prod |
++----------------+
+| MyGuests       |
++----------------+
+1 row in set (0.00 sec)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

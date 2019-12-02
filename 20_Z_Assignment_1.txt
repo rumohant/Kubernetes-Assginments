@@ -1,0 +1,335 @@
+Learning Objectives:-
+Create the `auth-svc` service
+Create the `data-svc` service
+
+
+Problem Statement:-
+Your company has just deployed two components of a web application to a Kubernetes cluster, using deployments with multiple replicas. They need a way to provide dynamic network access to these replicas so that there will be uninterrupted access to the components whenever replicas are created, removed, and replaced. One deployment is called auth-deployment, an authentication provider that needs to be accessible from outside the cluster. The other is called data-deployment, and it is a component designed to be accessed only by other pods within the cluster.
+
+The team wants you to create two services to expose these two components. Examine the two deployments, and create two services that meet the following criteria:
+
+auth-svc
+The service name is auth-svc.
+The service exposes the pod replicas managed by the deployment named auth-deployment.
+The service listens on port 8080 and its targetPort matches the port exposed by the pods.
+The service type is NodePort.
+data-svc
+The service name is data-svc.
+The service exposes the pod replicas managed by the deployment named data-deployment.
+The service listens on port 8080 and its targetPort matches the port exposed by the pods.
+The service type is ClusterIP.
+Note: All work should be done in the default namespace.
+
+
+******************************************************************************
+
+Step1---> Creating auth-deloyment.yml 
+
+vi auth-deloyment.yml
+
+Insert below data
+	apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: auth-deployment
+    labels:
+       app: nginx-app
+spec:
+    replicas: 3
+    selector:
+       matchLabels:
+           app: nginx-app
+    template:
+       metadata:
+           labels:
+             app: nginx-app
+       spec:
+            containers:
+            - name: nginx-controller
+              image: nginx:latest
+              ports:
+              - containerPort: 80
+			  
+Step2---> creating auth-svc.yml file
+
+ vi auth-svc.yml
+
+	apiVersion: v1
+kind: Service
+metadata:
+     name: auth-svc
+     labels:
+        app: nginx-app
+spec:
+    selector:
+        app: nginx-app
+    type: NodePort
+    ports:
+    - nodePort: 31150
+      port: 80
+      targetPort: 80
+	  
+Step3---> creating data-deployment.yml file
+	vi data-deloyment.yml
+	
+Insert below data 
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: data-deployment
+    labels:
+       app: nginx-app-1
+spec:
+    replicas: 3
+    selector:
+       matchLabels:
+           app: nginx-app-1
+    template:
+       metadata:
+           labels:
+             app: nginx-app-1
+       spec:
+            containers:
+            - name: nginx-controller-1
+              image: nginx:1.7.1
+              ports:
+              - containerPort: 80
+			  
+Step4---> creating data-svc.yml file
+
+vi data-svc.yml
+
+apiVersion: v1
+kind: Service
+metadata:
+     name: data-svc
+     labels:
+        app: nginx-app-1
+spec:
+    selector:
+        app: nginx-app-1
+    type: ClusterIP
+    ports:
+    - port: 8080
+      targetPort: 80
+	  
+Step5---> creating deployment and services
+
+kubectl create -f auth-deployment.yml
+o/p-> deployment.apps/auth-deployment created
+
+master $ kubectl create -f auth-svc.yml
+service/auth-svc created
+
+master $ kubectl create -f data-deloyment.yml
+deployment.apps/data-deployment created
+
+master $ kubectl create -f data-svc.yml
+service/data-svc created
+
+Step6----------> 
+
+	master $ kubectl get deploy
+NAME              READY   UP-TO-DATE   AVAILABLE   AGE
+auth-deployment   3/3     3            3           10m
+data-deployment   3/3     3            3           8m37s
+
+Step7---------->
+		master $ kubectl get po
+NAME                               READY   STATUS    RESTARTS   AGE
+auth-deployment-fcdc4cd4f-5qzmj    1/1     Running   0          11m
+auth-deployment-fcdc4cd4f-ctl4b    1/1     Running   0          11m
+auth-deployment-fcdc4cd4f-ksk42    1/1     Running   0          11m
+data-deployment-6f6698cdf9-nwm4q   1/1     Running   0          9m34s
+data-deployment-6f6698cdf9-qm6hz   1/1     Running   0          9m34s
+data-deployment-6f6698cdf9-xncp9   1/1     Running   0          9m34s
+
+Step8-----------> 
+		master $ kubectl describe deploy auth-deployment
+Name:                   auth-deployment
+Namespace:              default
+CreationTimestamp:      Mon, 02 Dec 2019 09:58:44 +0000
+Labels:                 app=nginx-app
+Annotations:            deployment.kubernetes.io/revision: 1
+Selector:               app=nginx-app
+Replicas:               3 desired | 3 updated | 3 total | 3 available | 0 unavailable
+StrategyType:           RollingUpdate
+MinReadySeconds:        0
+RollingUpdateStrategy:  25% max unavailable, 25% max surge
+Pod Template:
+  Labels:  app=nginx-app
+  Containers:
+   nginx-controller:
+    Image:        nginx:latest
+    Port:         80/TCP
+    Host Port:    0/TCP
+    Environment:  <none>
+    Mounts:       <none>
+  Volumes:        <none>
+Conditions:
+  Type           Status  Reason
+  ----           ------  ------
+  Available      True    MinimumReplicasAvailable
+  Progressing    True    NewReplicaSetAvailable
+OldReplicaSets:  <none>
+NewReplicaSet:   auth-deployment-fcdc4cd4f (3/3 replicas created)
+Events:
+  Type    Reason             Age   From                   Message
+  ----    ------             ----  ----                   -------
+  Normal  ScalingReplicaSet  12m   deployment-controller  Scaled up replica set auth-deployment-fcdc4cd4f to 3
+  
+  
+Step9------------->
+
+		master $ kubectl describe deploy data-deployment
+Name:                   data-deployment
+Namespace:              default
+CreationTimestamp:      Mon, 02 Dec 2019 10:00:47 +0000
+Labels:                 app=nginx-app-1
+Annotations:            deployment.kubernetes.io/revision: 1
+Selector:               app=nginx-app-1
+Replicas:               3 desired | 3 updated | 3 total | 3 available | 0 unavailable
+StrategyType:           RollingUpdate
+MinReadySeconds:        0
+RollingUpdateStrategy:  25% max unavailable, 25% max surge
+Pod Template:
+  Labels:  app=nginx-app-1
+  Containers:
+   nginx-controller-1:
+    Image:        nginx:1.7.1
+    Port:         80/TCP
+    Host Port:    0/TCP
+    Environment:  <none>
+    Mounts:       <none>
+  Volumes:        <none>
+Conditions:
+  Type           Status  Reason
+  ----           ------  ------
+  Available      True    MinimumReplicasAvailable
+  Progressing    True    NewReplicaSetAvailable
+OldReplicaSets:  <none>
+NewReplicaSet:   data-deployment-6f6698cdf9 (3/3 replicas created)
+Events:
+  Type    Reason             Age   From                   Message
+  ----    ------             ----  ----                   -------
+  Normal  ScalingReplicaSet  11m   deployment-controller  Scaled up replica set data-deployment-6f6698cdf9 to 3
+  
+  
+ Step10--------------> SERVICE_TYPE
+ 
+ master $ kubectl get service
+NAME         TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)        AGE
+auth-svc     NodePort    10.105.11.31     <none>        80:31150/TCP   15m
+data-svc     ClusterIP   10.104.159.197   <none>        8080/TCP       12m
+kubernetes   ClusterIP   10.96.0.1        <none>        443/TCP        36m
+
+********************************************************************************
+
+master $ kubectl describe svc auth-svc
+Name:                     auth-svc
+Namespace:                default
+Labels:                   app=nginx-app
+Annotations:              <none>
+Selector:                 app=nginx-app
+Type:                     NodePort
+IP:                       10.105.11.31
+Port:                     <unset>  80/TCP
+TargetPort:               80/TCP
+NodePort:                 <unset>  31150/TCP
+Endpoints:                10.40.0.1:80,10.40.0.2:80,10.40.0.3:80
+Session Affinity:         None
+External Traffic Policy:  Cluster
+Events:                   <none>
+
+*******************************************************************************
+
+master $ kubectl describe svc data-svc
+Name:              data-svc
+Namespace:         default
+Labels:            app=nginx-app-1
+Annotations:       <none>
+Selector:          app=nginx-app-1
+Type:              ClusterIP
+IP:                10.104.159.197
+Port:              <unset>  8080/TCP
+TargetPort:        80/TCP
+Endpoints:         10.40.0.4:80,10.40.0.5:80,10.40.0.6:80
+Session Affinity:  None
+Events:            <none>
+
+*******************************************************************************
+
+master $ kubectl get svc
+NAME         TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)        AGE
+auth-svc     NodePort    10.105.11.31     <none>        80:31150/TCP   18m
+data-svc     ClusterIP   10.104.159.197   <none>        8080/TCP       14m
+kubernetes   ClusterIP   10.96.0.1        <none>        443/TCP        38m
+
+Step11-------> Displaying the content of nginx-webpage on the terminal
+
+master $ curl 10.104.159.197:8080
+O/P--> 
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+    body {
+        width: 35em;
+        margin: 0 auto;
+        font-family: Tahoma, Verdana, Arial, sans-serif;
+    }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, the nginx web server is successfully installed and
+working. Further configuration is required.</p>
+
+<p>For online documentation and support please refer to
+<a href="http://nginx.org/">nginx.org</a>.<br/>
+Commercial support is available at
+<a href="http://nginx.com/">nginx.com</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
